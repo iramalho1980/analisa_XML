@@ -1,0 +1,1308 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leitor de XML NF-e - Manus</title>
+    <style>
+        :root {
+            --bg-gradient: linear-gradient(to right, #19547b, #ffd89b);
+            --glass-bg: rgba(255, 255, 255, 0.15);
+            --glass-border: rgba(255, 255, 255, 0.2);
+            --text-color: #ffffff;
+            --accent-color: #ffd89b;
+            --table-bg: rgba(255, 255, 255, 0.1);
+            --row-height: 45px;
+        }
+
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg-gradient);
+            background-attachment: fixed;
+            color: var(--text-color);
+            min-height: 100vh;
+            transition: background 0.5s ease;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            text-shadow: 2px 2px 8px rgba(0,0,0,0.4);
+        }
+
+        .glass-panel {
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+        }
+
+        /* Engrenagem Seletora */
+        .settings-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+
+        .gear-btn {
+            background: var(--glass-bg);
+            backdrop-filter: blur(5px);
+            border: 1px solid var(--glass-border);
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            color: white;
+        }
+
+        .gear-btn:hover {
+            transform: rotate(120deg) scale(1.1);
+        }
+
+        .skin-menu {
+            position: absolute;
+            top: 65px;
+            right: 0;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(15px);
+            padding: 20px;
+            border-radius: 15px;
+            border: 1px solid rgba(255,255,255,0.1);
+            display: none;
+            width: 220px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.5);
+        }
+
+        .skin-menu.active {
+            display: block;
+            animation: fadeInMenu 0.3s ease;
+        }
+
+        @keyframes fadeInMenu {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .skin-option {
+            height: 40px;
+            margin-bottom: 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .skin-option:hover {
+            transform: translateX(5px);
+            border-color: white;
+        }
+
+        /* Upload Area */
+        .upload-section {
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        #file-input {
+            display: none;
+        }
+
+        .upload-label {
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px dashed rgba(255, 255, 255, 0.4);
+            color: white;
+            padding: 20px 40px;
+            border-radius: 15px;
+            cursor: pointer;
+            font-weight: bold;
+            display: inline-block;
+            transition: all 0.3s;
+            font-size: 1.1rem;
+        }
+
+        .upload-label:hover {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: white;
+        }
+
+        /* Spinner de Carregamento */
+        #loader-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(8px);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+
+        .spinner {
+            width: 80px;
+            height: 80px;
+            border: 8px solid rgba(255,255,255,0.1);
+            border-top: 8px solid var(--accent-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        /* Spinner Local para Filtros */
+        .local-spinner {
+            display: none;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,0.1);
+            border-top: 3px solid var(--accent-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-left: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        #progress-text {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: white;
+        }
+
+        /* Dashboard Layout */
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 25px;
+            margin-bottom: 50px;
+        }
+
+        .full-width {
+            grid-column: 1 / -1;
+        }
+
+        @media (max-width: 600px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            padding: 25px;
+            display: none;
+            flex-direction: column;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.5s ease, transform 0.5s ease;
+        }
+
+        .card.visible {
+            display: flex;
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .card h2 {
+            margin-top: 0;
+            margin-bottom: 15px;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+            padding-bottom: 15px;
+            font-size: 1.3rem;
+            color: var(--accent-color);
+            letter-spacing: 1px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .clear-filter-btn {
+            font-size: 0.75rem;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            display: none;
+            transition: all 0.2s;
+        }
+
+        .clear-filter-btn:hover {
+            background: rgba(255,255,255,0.2);
+        }
+
+        /* Indicador de Filtro Suave */
+        .filter-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.8rem;
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .filter-indicator:hover {
+            background: rgba(255, 255, 255, 0.12);
+            color: rgba(255, 255, 255, 0.8);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .filter-icon {
+            font-size: 1rem;
+        }
+
+        /* Filtros - Layout Implícito */
+        .filters-section {
+            display: none;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 15px;
+            border: 1px solid rgba(255,255,255,0.1);
+            animation: slideDown 0.3s ease;
+            max-height: 0;
+            overflow: hidden;
+        }
+
+        .filters-section.active {
+            display: block;
+            max-height: 800px;
+            animation: slideDown 0.3s ease;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                max-height: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                max-height: 800px;
+                transform: translateY(0);
+            }
+        }
+
+        .filters-grid {
+            display: grid;
+            gap: 12px;
+            margin-bottom: 15px;
+        }
+
+        .filter-column {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .filter-column label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--accent-color);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .filter-input, .filter-combo {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 6px;
+            color: white;
+            font-size: 0.8rem;
+            padding: 8px 10px;
+            box-sizing: border-box;
+            transition: all 0.2s;
+        }
+
+        .filter-input::placeholder {
+            color: rgba(255, 255, 255, 0.3);
+        }
+
+        .filter-input:focus, .filter-combo:focus {
+            outline: none;
+            border-color: var(--accent-color);
+            background: rgba(255, 255, 255, 0.12);
+            box-shadow: 0 0 8px rgba(255, 255, 255, 0.1);
+        }
+
+        .filter-combo option {
+            background: #1a1a2e;
+            color: white;
+        }
+
+        /* Seção de Alteração em Lote */
+        .batch-section {
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            padding-top: 12px;
+            margin-top: 12px;
+        }
+
+        .batch-section-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--accent-color);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 10px;
+            display: block;
+        }
+
+        .batch-controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr auto;
+            gap: 8px;
+            align-items: flex-end;
+        }
+
+        .batch-btn-apply {
+            background: var(--accent-color);
+            color: #000;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 0.75rem;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .batch-btn-apply:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255, 216, 155, 0.3);
+        }
+
+        /* Limite de 5 linhas com rolagem */
+        .table-container {
+            overflow-x: auto;
+            overflow-y: auto;
+            max-height: calc(var(--row-height) * 8);
+            border-radius: 10px;
+            background: var(--table-bg);
+        }
+
+        .table-container::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        .table-container::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+        }
+        .table-container::-webkit-scrollbar-thumb {
+            background: var(--accent-color);
+            border-radius: 10px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+
+        th, td {
+            text-align: left;
+            padding: 0 12px;
+            height: var(--row-height);
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            white-space: nowrap;
+        }
+
+        th {
+            background: rgba(0, 0, 0, 0.4);
+            position: sticky;
+            top: 0;
+            color: var(--accent-color);
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            z-index: 10;
+        }
+
+        tr:hover {
+            background: rgba(255,255,255,0.05);
+        }
+
+        /* CFOP Clicável */
+        .cfop-clickable {
+            cursor: pointer;
+            color: var(--accent-color);
+            font-weight: bold;
+            text-decoration: underline;
+        }
+
+        .cfop-clickable:hover {
+            color: white;
+        }
+
+        .empty-msg {
+            text-align: center;
+            color: rgba(255,255,255,0.5);
+            padding: 30px;
+            font-style: italic;
+        }
+
+        .summary-box {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 10px;
+            font-weight: bold;
+            font-size: 1.1rem;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        #total-geral-valor {
+            color: #4ade80;
+        }
+
+        /* Modal / Popup */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            backdrop-filter: blur(10px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 3000;
+        }
+
+        .modal-content {
+            width: 80%;
+            max-width: 600px;
+            padding: 30px;
+            position: relative;
+        }
+
+        .close-modal {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            font-size: 2rem;
+            cursor: pointer;
+            color: rgba(255,255,255,0.5);
+            transition: color 0.2s;
+        }
+
+        .close-modal:hover {
+            color: white;
+        }
+
+        .modal-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .modal-item {
+            background: rgba(255,255,255,0.05);
+            padding: 15px;
+            border-radius: 10px;
+            border-left: 4px solid var(--accent-color);
+        }
+
+        .modal-item label {
+            display: block;
+            font-size: 0.8rem;
+            color: rgba(255,255,255,0.6);
+            margin-bottom: 5px;
+        }
+
+        .modal-item span {
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+
+        /* Responsividade para filtros */
+        @media (max-width: 768px) {
+            .filters-grid {
+                grid-template-columns: 1fr;
+            }
+            .batch-controls {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="loader-overlay">
+        <div class="spinner"></div>
+        <div id="progress-text">0%</div>
+    </div>
+
+    <div class="modal-overlay" id="modal-cfop">
+        <div class="modal-content glass-panel">
+            <span class="close-modal" id="close-modal">&times;</span>
+            <h2 style="margin-top:0">Detalhes do CFOP: <span id="modal-cfop-id"></span></h2>
+            <div class="modal-grid">
+                <div class="modal-item">
+                    <label>Qtd. Itens</label>
+                    <span id="modal-total-prod">0</span>
+                </div>
+                <div class="modal-item">
+                    <label>Valor Contábil Total</label>
+                    <span id="modal-total-valor">R$ 0,00</span>
+                </div>
+                <div class="modal-item">
+                    <label>Total ICMS</label>
+                    <span id="modal-total-icms">R$ 0,00</span>
+                </div>
+                <div class="modal-item">
+                    <label>Total ICMS ST</label>
+                    <span id="modal-total-st">R$ 0,00</span>
+                </div>
+                <div class="modal-item">
+                    <label>Total IPI</label>
+                    <span id="modal-total-ipi">R$ 0,00</span>
+                </div>
+                <div class="modal-item">
+                    <label>Total PIS</label>
+                    <span id="modal-total-pis">R$ 0,00</span>
+                </div>
+                <div class="modal-item">
+                    <label>Total COFINS</label>
+                    <span id="modal-total-cofins">R$ 0,00</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="settings-container">
+        <button class="gear-btn" id="gear-btn">⚙️</button>
+        <div class="skin-menu glass-panel" id="skin-menu">
+            <div class="skin-option" style="background: linear-gradient(to right, #19547b, #ffd89b)" data-skin="0"></div>
+            <div class="skin-option" style="background: linear-gradient(to right, #004e92, #000428)" data-skin="1"></div>
+            <div class="skin-option" style="background: linear-gradient(to right, #237A57, #093028)" data-skin="2"></div>
+            <div class="skin-option" style="background: linear-gradient(to right, #283E51, #4B79A1)" data-skin="3"></div>
+            <div class="skin-option" style="background: linear-gradient(to right, #2C5364, #203A43, #0F2027)" data-skin="4"></div>
+        </div>
+    </div>
+
+    <div class="container">
+        <header>
+            <h1>Leitor de XML NF-e</h1>
+            <p>Processamento Inteligente de Documentos Fiscais</p>
+        </header>
+
+        <div class="upload-section glass-panel">
+            <label for="file-input" class="upload-label">
+                📂 Selecionar Arquivos XML
+            </label>
+            <input type="file" id="file-input" multiple accept=".xml">
+            <p id="file-count" style="margin-top: 15px; opacity: 0.8;">Nenhum arquivo selecionado</p>
+        </div>
+
+        <div class="dashboard">
+            <!-- PRODUTOS -->
+            <div class="card glass-panel full-width" id="card-produtos">
+                <h2>
+                    <span>PRODUTOS DAS NOTAS <div class="local-spinner" id="spinner-produtos"></div></span>
+                    <div class="header-actions">
+                        <div class="filter-indicator" onclick="toggleFilters('table-produtos')">
+                            <span class="filter-icon">🔍</span>
+                            <span>Filtros</span>
+                        </div>
+                        <button class="clear-filter-btn" id="clear-filter">Limpar Filtros</button>
+                    </div>
+                </h2>
+                <div class="filters-section" id="filters-table-produtos">
+                    <div class="filters-grid" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));">
+                    </div>
+                    <div class="batch-section">
+                        <span class="batch-section-title">Alterar em Lote</span>
+                        <div class="batch-controls">
+                            <select class="filter-combo batch-column-select" data-table="table-produtos">
+                                <option value="">Selecionar coluna...</option>
+                            </select>
+                            <input type="text" class="filter-input batch-new-value" placeholder="Novo valor" data-table="table-produtos">
+                            <button class="batch-btn-apply" onclick="applyBatchUpdate('table-produtos')">Alterar</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table id="table-produtos">
+                        <thead>
+                            <tr>
+                                <th>Nota</th>
+                                <th>Cód.</th>
+                                <th>Descrição</th>
+                                <th>CFOP</th>
+                                <th>Valor (R$)</th>
+                                <th>CST PIS</th><th>% PIS</th><th>V. PIS</th>
+                                <th>CST COF.</th><th>% COF.</th><th>V. COF.</th>
+                                <th>CST ICMS</th><th>V. ICMS</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                    <div class="empty-msg" id="msg-produtos">Nenhum dado carregado</div>
+                </div>
+            </div>
+
+            <!-- EMISSORES -->
+            <div class="card glass-panel" id="card-emissores">
+                <h2>
+                    <span>EMISSORES <div class="local-spinner" id="spinner-emissores"></div></span>
+                    <div class="header-actions">
+                        <div class="filter-indicator" onclick="toggleFilters('table-emissores')">
+                            <span class="filter-icon">🔍</span>
+                            <span>Filtros</span>
+                        </div>
+                    </div>
+                </h2>
+                <div class="filters-section" id="filters-table-emissores">
+                    <div class="filters-grid" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));">
+                    </div>
+                    <div class="batch-section">
+                        <span class="batch-section-title">Alterar em Lote</span>
+                        <div class="batch-controls">
+                            <select class="filter-combo batch-column-select" data-table="table-emissores">
+                                <option value="">Selecionar coluna...</option>
+                            </select>
+                            <input type="text" class="filter-input batch-new-value" placeholder="Novo valor" data-table="table-emissores">
+                            <button class="batch-btn-apply" onclick="applyBatchUpdate('table-emissores')">Alterar</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table id="table-emissores">
+                        <thead>
+                            <tr>
+                                <th>CNPJ</th>
+                                <th>Nome / Razão Social</th>
+                                <th>UF</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                    <div class="empty-msg" id="msg-emissores">Nenhum dado carregado</div>
+                </div>
+            </div>
+
+            <!-- DESTINATÁRIOS -->
+            <div class="card glass-panel" id="card-destinatarios">
+                <h2>
+                    <span>DESTINATÁRIOS <div class="local-spinner" id="spinner-destinatarios"></div></span>
+                    <div class="header-actions">
+                        <div class="filter-indicator" onclick="toggleFilters('table-destinatarios')">
+                            <span class="filter-icon">🔍</span>
+                            <span>Filtros</span>
+                        </div>
+                    </div>
+                </h2>
+                <div class="filters-section" id="filters-table-destinatarios">
+                    <div class="filters-grid" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));">
+                    </div>
+                    <div class="batch-section">
+                        <span class="batch-section-title">Alterar em Lote</span>
+                        <div class="batch-controls">
+                            <select class="filter-combo batch-column-select" data-table="table-destinatarios">
+                                <option value="">Selecionar coluna...</option>
+                            </select>
+                            <input type="text" class="filter-input batch-new-value" placeholder="Novo valor" data-table="table-destinatarios">
+                            <button class="batch-btn-apply" onclick="applyBatchUpdate('table-destinatarios')">Alterar</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table id="table-destinatarios">
+                        <thead>
+                            <tr>
+                                <th>CNPJ/CPF</th>
+                                <th>Nome / Razão Social</th>
+                                <th>UF</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                    <div class="empty-msg" id="msg-destinatarios">Nenhum dado carregado</div>
+                </div>
+            </div>
+
+            <!-- CFOP DAS NOTAS -->
+            <div class="card glass-panel" id="card-cfop">
+                <h2>
+                    <span>CFOP DAS NOTAS <div class="local-spinner" id="spinner-cfop"></div></span>
+                    <div class="header-actions">
+                        <div class="filter-indicator" onclick="toggleFilters('table-cfop')">
+                            <span class="filter-icon">🔍</span>
+                            <span>Filtros</span>
+                        </div>
+                    </div>
+                </h2>
+                <div class="filters-section" id="filters-table-cfop">
+                    <div class="filters-grid" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));">
+                    </div>
+                    <div class="batch-section">
+                        <span class="batch-section-title">Alterar em Lote</span>
+                        <div class="batch-controls">
+                            <select class="filter-combo batch-column-select" data-table="table-cfop">
+                                <option value="">Selecionar coluna...</option>
+                            </select>
+                            <input type="text" class="filter-input batch-new-value" placeholder="Novo valor" data-table="table-cfop">
+                            <button class="batch-btn-apply" onclick="applyBatchUpdate('table-cfop')">Alterar</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table id="table-cfop">
+                        <thead>
+                            <tr>
+                                <th>CFOP</th>
+                                <th>Qtd. Itens</th>
+                                <th>Valor Total CFOP</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                    <div class="empty-msg" id="msg-cfop">Nenhum dado carregado</div>
+                </div>
+            </div>
+
+            <!-- VALORES -->
+            <div class="card glass-panel" id="card-valores">
+                <h2>
+                    <span>VALORES <div class="local-spinner" id="spinner-valores"></div></span>
+                    <div class="header-actions">
+                        <div class="filter-indicator" onclick="toggleFilters('table-valores')">
+                            <span class="filter-icon">🔍</span>
+                            <span>Filtros</span>
+                        </div>
+                    </div>
+                </h2>
+                <div class="filters-section" id="filters-table-valores">
+                    <div class="filters-grid" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));">
+                    </div>
+                    <div class="batch-section">
+                        <span class="batch-section-title">Alterar em Lote</span>
+                        <div class="batch-controls">
+                            <select class="filter-combo batch-column-select" data-table="table-valores">
+                                <option value="">Selecionar coluna...</option>
+                            </select>
+                            <input type="text" class="filter-input batch-new-value" placeholder="Novo valor" data-table="table-valores">
+                            <button class="batch-btn-apply" onclick="applyBatchUpdate('table-valores')">Alterar</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table id="table-valores">
+                        <thead>
+                            <tr>
+                                <th>Chave de Acesso</th>
+                                <th>Número</th>
+                                <th>Valor Total (R$)</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                    <div class="empty-msg" id="msg-valores">Nenhum dado carregado</div>
+                </div>
+                <div class="summary-box" id="total-geral-container" style="display:none;">
+                    <span>TOTAL GERAL:</span>
+                    <span id="total-geral-valor">R$ 0,00</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configurações de Skin
+        const skins = [
+            "linear-gradient(to right, #19547b, #ffd89b)",
+            "linear-gradient(to right, #004e92, #000428)",
+            "linear-gradient(to right, #237A57, #093028)",
+            "linear-gradient(to right, #283E51, #4B79A1)",
+            "linear-gradient(to right, #2C5364, #203A43, #0F2027)"
+        ];
+
+        const accentColors = ['#ffd89b', '#004e92', '#237A57', '#4B79A1', '#2C5364'];
+
+        const gearBtn = document.getElementById('gear-btn');
+        const skinMenu = document.getElementById('skin-menu');
+        const skinOptions = document.querySelectorAll('.skin-option');
+
+        gearBtn.onclick = () => skinMenu.classList.toggle('active');
+
+        skinOptions.forEach(opt => {
+            opt.onclick = () => {
+                const skinIdx = opt.getAttribute('data-skin');
+                document.body.style.background = skins[skinIdx];
+                document.body.style.backgroundAttachment = 'fixed';
+                document.documentElement.style.setProperty('--accent-color', accentColors[skinIdx]);
+                skinMenu.classList.remove('active');
+            };
+        });
+
+        // Modal Logic
+        const modal = document.getElementById('modal-cfop');
+        const closeModal = document.getElementById('close-modal');
+        closeModal.onclick = () => modal.style.display = 'none';
+        window.onclick = (e) => { 
+            if (e.target == modal) modal.style.display = 'none';
+        };
+
+        // Toggle Filtros
+        function toggleFilters(tableId) {
+            const filterSection = document.getElementById(`filters-${tableId}`);
+            filterSection.classList.toggle('active');
+        }
+
+        // Processamento de XML
+        const parser = new DOMParser();
+        const ns = "http://www.portalfiscal.inf.br/nfe";
+
+        const getTagValue = (parent, tag) => {
+            let el = parent.getElementsByTagName(tag)[0];
+            if (!el) el = parent.getElementsByTagNameNS(ns, tag)[0];
+            return el ? el.textContent : "";
+        };
+
+        const fileInput = document.getElementById('file-input');
+        const fileCountMsg = document.getElementById('file-count');
+        const loaderOverlay = document.getElementById('loader-overlay');
+        const progressText = document.getElementById('progress-text');
+        const cards = document.querySelectorAll('.card');
+        const clearFilterBtn = document.getElementById('clear-filter');
+
+        let allProducts = [];
+        let cfopSummary = new Map();
+        let tableConfigs = {
+            'table-produtos': { columns: 5, labels: ['Nota', 'Cód.', 'Descrição', 'CFOP', 'Valor (R$)'] },
+            'table-emissores': { columns: 3, labels: ['CNPJ', 'Nome / Razão Social', 'UF'] },
+            'table-destinatarios': { columns: 3, labels: ['CNPJ/CPF', 'Nome / Razão Social', 'UF'] },
+            'table-cfop': { columns: 3, labels: ['CFOP', 'Qtd. Itens', 'Valor Total CFOP'] },
+            'table-valores': { columns: 3, labels: ['Chave de Acesso', 'Número', 'Valor Total (R$)'] }
+        };
+
+        fileInput.onchange = async (e) => {
+            const files = Array.from(e.target.files);
+            if (files.length === 0) return;
+
+            allProducts = [];
+            cfopSummary = new Map();
+            clearFilterBtn.style.display = 'none';
+
+            // Reset UI
+            cards.forEach(card => {
+                card.classList.remove('visible');
+                card.style.display = 'none';
+            });
+
+            loaderOverlay.style.display = 'flex';
+            progressText.innerText = '0%';
+            fileCountMsg.innerText = `${files.length} arquivo(s) selecionado(s)`;
+            
+            const tables = ['emissores', 'destinatarios', 'cfop', 'valores', 'produtos'];
+            tables.forEach(t => {
+                document.querySelector(`#table-${t} tbody`).innerHTML = '';
+                document.getElementById(`msg-${t}`).style.display = 'none';
+                document.getElementById(`filters-table-${t}`).querySelector('.filters-grid').innerHTML = '';
+            });
+
+            let dataEmissores = new Map();
+            let dataDestinatarios = new Map();
+            let totalGeral = 0;
+
+            const batchSize = 20;
+            for (let i = 0; i < files.length; i += batchSize) {
+                const batch = files.slice(i, i + batchSize);
+                
+                await Promise.all(batch.map(async (file) => {
+                    try {
+                        const text = await file.text();
+                        const xmlDoc = parser.parseFromString(text, "text/xml");
+                        const infNFe = xmlDoc.getElementsByTagName('infNFe')[0] || xmlDoc.getElementsByTagNameNS(ns, 'infNFe')[0];
+                        
+                        if (!infNFe) return;
+
+                        const chave = infNFe.getAttribute('Id').replace('NFe', '');
+                        const numero = getTagValue(infNFe, 'nNF');
+                        const vNF = parseFloat(getTagValue(infNFe, 'vNF') || 0);
+                        totalGeral += vNF;
+
+                        // Emissor
+                        const emit = infNFe.getElementsByTagName('emit')[0] || infNFe.getElementsByTagNameNS(ns, 'emit')[0];
+                        const cnpjEmit = getTagValue(emit, 'CNPJ') || getTagValue(emit, 'CPF');
+                        if (!dataEmissores.has(cnpjEmit)) {
+                            const xNomeEmit = getTagValue(emit, 'xNome');
+                            const enderEmit = emit.getElementsByTagName('enderEmit')[0] || emit.getElementsByTagNameNS(ns, 'enderEmit')[0];
+                            const ufEmit = getTagValue(enderEmit, 'UF');
+                            dataEmissores.set(cnpjEmit, { nome: xNomeEmit, uf: ufEmit });
+                        }
+
+                        // Destinatário
+                        const dest = infNFe.getElementsByTagName('dest')[0] || infNFe.getElementsByTagNameNS(ns, 'dest')[0];
+                        if (dest) {
+                            const cnpjDest = getTagValue(dest, 'CNPJ') || getTagValue(dest, 'CPF');
+                            if (!dataDestinatarios.has(cnpjDest)) {
+                                const xNomeDest = getTagValue(dest, 'xNome');
+                                const enderDest = dest.getElementsByTagName('enderDest')[0] || dest.getElementsByTagNameNS(ns, 'enderDest')[0];
+                                const ufDest = getTagValue(enderDest, 'UF');
+                                dataDestinatarios.set(cnpjDest, { nome: xNomeDest, uf: ufDest });
+                            }
+                        }
+
+                        // Produtos e Impostos
+                        const detList = infNFe.getElementsByTagName('det') || infNFe.getElementsByTagNameNS(ns, 'det');
+                        for (let det of detList) {
+                            const prod = det.getElementsByTagName('prod')[0] || det.getElementsByTagNameNS(ns, 'prod')[0];
+                            const imposto = det.getElementsByTagName('imposto')[0] || det.getElementsByTagNameNS(ns, 'imposto')[0];
+                            
+                            const cProd = getTagValue(prod, 'cProd');
+                            const xProd = getTagValue(prod, 'xProd'); 
+                            const cfop = getTagValue(prod, 'CFOP');
+                            const vProd = parseFloat(getTagValue(prod, 'vProd') || 0);
+
+                            // PIS
+                            const pis = imposto.getElementsByTagName('PIS')[0] || imposto.getElementsByTagNameNS(ns, 'PIS')[0];
+                            let cstPis = "", pPis = "0", vPis = "0";
+                            if (pis && pis.children.length > 0) {
+                                const pisChild = pis.children[0];
+                                cstPis = getTagValue(pisChild, 'CST');
+                                pPis = getTagValue(pisChild, 'pPIS') || "0";
+                                vPis = getTagValue(pisChild, 'vPIS') || "0";
+                            }
+
+                            // COFINS
+                            const cofins = imposto.getElementsByTagName('COFINS')[0] || imposto.getElementsByTagNameNS(ns, 'COFINS')[0];
+                            let cstCofins = "", pCofins = "0", vCofins = "0";
+                            if (cofins && cofins.children.length > 0) {
+                                const cofinsChild = cofins.children[0];
+                                cstCofins = getTagValue(cofinsChild, 'CST');
+                                pCofins = getTagValue(cofinsChild, 'pCOFINS') || "0";
+                                vCofins = getTagValue(cofinsChild, 'vCOFINS') || "0";
+                            }
+
+                            // ICMS e ICMS ST
+                            const icms = imposto.getElementsByTagName('ICMS')[0] || imposto.getElementsByTagNameNS(ns, 'ICMS')[0];
+                            let cstIcms = "", vIcms = "0", vIcmsST = "0";
+                            if (icms && icms.children.length > 0) {
+                                const icmsChild = icms.children[0];
+                                cstIcms = getTagValue(icmsChild, 'CST') || getTagValue(icmsChild, 'CSOSN');
+                                vIcms = getTagValue(icmsChild, 'vICMS') || "0";
+                                vIcmsST = getTagValue(icmsChild, 'vICMSST') || "0";
+                            }
+
+                            // IPI
+                            const ipi = imposto.getElementsByTagName('IPI')[0] || imposto.getElementsByTagNameNS(ns, 'IPI')[0];
+                            let vIpi = "0";
+                            if (ipi) {
+                                vIpi = getTagValue(ipi, 'vIPI') || "0";
+                            }
+                            
+                            allProducts.push({
+                                nota: numero, cProd, xProd, cfop, vProd,
+                                cstPis, pPis, vPis,
+                                cstCofins, pCofins, vCofins,
+                                cstIcms, vIcms, vIcmsST, vIpi
+                            });
+
+                            if (!cfopSummary.has(cfop)) {
+                                cfopSummary.set(cfop, { qtd: 0, valor: 0, icms: 0, st: 0, ipi: 0, pis: 0, cofins: 0 });
+                            }
+                            const s = cfopSummary.get(cfop);
+                            s.qtd += 1;
+                            s.valor += vProd;
+                            s.icms += parseFloat(vIcms);
+                            s.st += parseFloat(vIcmsST);
+                            s.ipi += parseFloat(vIpi);
+                            s.pis += parseFloat(vPis);
+                            s.cofins += parseFloat(vCofins);
+                        }
+
+                        addRow('table-valores', [chave, numero, vNF.toLocaleString('pt-BR', {minimumFractionDigits: 2})]);
+
+                    } catch (err) {
+                        console.error("Erro ao processar arquivo:", file.name, err);
+                    }
+                }));
+
+                const currentProgress = Math.min(100, Math.round(((i + batchSize) / files.length) * 100));
+                progressText.innerText = `${currentProgress}%`;
+                await new Promise(r => setTimeout(r, 1));
+            }
+
+            dataEmissores.forEach((val, key) => addRow('table-emissores', [key, val.nome, val.uf]));
+            dataDestinatarios.forEach((val, key) => addRow('table-destinatarios', [key, val.nome, val.uf]));
+            
+            const cfopBody = document.querySelector('#table-cfop tbody');
+            cfopSummary.forEach((val, key) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="cfop-clickable" onclick="filterByCfop('${key}')">${key}</td>
+                    <td>${val.qtd}</td>
+                    <td>${val.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                `;
+                cfopBody.appendChild(tr);
+            });
+
+            renderProducts(allProducts);
+            populateAllFilters();
+
+            document.getElementById('total-geral-container').style.display = 'flex';
+            document.getElementById('total-geral-valor').innerText = totalGeral.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
+
+            loaderOverlay.style.display = 'none';
+            cards.forEach((card, index) => {
+                card.style.display = 'flex';
+                requestAnimationFrame(() => {
+                    setTimeout(() => {
+                        card.classList.add('visible');
+                    }, 50 * index);
+                });
+            });
+        };
+
+        function populateAllFilters() {
+            Object.keys(tableConfigs).forEach(tableId => {
+                const config = tableConfigs[tableId];
+                const table = document.getElementById(tableId);
+                const tbody = table.querySelector('tbody');
+                const rows = tbody.querySelectorAll('tr');
+                const filterId = `filters-${tableId}`;
+                const filterContainer = document.getElementById(filterId).querySelector('.filters-grid');
+                const batchSelect = document.querySelector(`.batch-column-select[data-table="${tableId}"]`);
+
+                // Limpar opções anteriores do batch select
+                batchSelect.innerHTML = '<option value="">Selecionar coluna...</option>';
+
+                for (let colIdx = 0; colIdx < config.columns; colIdx++) {
+                    const uniqueValues = new Set();
+                    rows.forEach(row => {
+                        const cell = row.cells[colIdx];
+                        if (cell) {
+                            const value = cell.textContent.trim();
+                            if (value) uniqueValues.add(value);
+                        }
+                    });
+
+                    const filterColumn = document.createElement('div');
+                    filterColumn.className = 'filter-column';
+
+                    const label = document.createElement('label');
+                    label.textContent = config.labels[colIdx];
+                    filterColumn.appendChild(label);
+
+                    const input = document.createElement('input');
+                    input.type = 'text';
+                    input.className = 'filter-input';
+                    input.placeholder = 'Pesquisar...';
+                    input.onkeyup = () => filterTableDelayed(tableId, colIdx);
+                    filterColumn.appendChild(input);
+
+                    const combo = document.createElement('select');
+                    combo.className = 'filter-combo';
+                    combo.onchange = () => filterTableByCombo(tableId, colIdx, combo.value);
+                    
+                    const optDefault = document.createElement('option');
+                    optDefault.value = '';
+                    optDefault.textContent = 'Selecionar...';
+                    combo.appendChild(optDefault);
+
+                    Array.from(uniqueValues).sort().forEach(val => {
+                        const opt = document.createElement('option');
+                        opt.value = val;
+                        opt.textContent = val;
+                        combo.appendChild(opt);
+                    });
+
+                    filterColumn.appendChild(combo);
+                    filterContainer.appendChild(filterColumn);
+
+                    // Adicionar opção ao batch select
+                    const batchOpt = document.createElement('option');
+                    batchOpt.value = colIdx;
+                    batchOpt.textContent = config.labels[colIdx];
+                    batchSelect.appendChild(batchOpt);
+                }
+            });
+        }
+
+        function renderProducts(products) {
+            const tbody = document.querySelector('#table-produtos tbody');
+            tbody.innerHTML = '';
+            const fragment = document.createDocumentFragment();
+            products.forEach(p => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${p.nota}</td><td>${p.cProd}</td><td>${p.xProd}</td><td>${p.cfop}</td>
+                    <td>${p.vProd.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                    <td>${p.cstPis}</td><td>${p.pPis}</td><td>${p.vPis}</td>
+                    <td>${p.cstCofins}</td><td>${p.pCofins}</td><td>${p.vCofins}</td>
+                    <td>${p.cstIcms}</td><td>${p.vIcms}</td>
+                `;
+                fragment.appendChild(tr);
+            });
+            tbody.appendChild(fragment);
+            document.getElementById('msg-produtos').style.display = products.length ? 'none' : 'block';
+        }
+
+        function filterTableDelayed(tableId, colIndex) {
+            const spinner = document.getElementById(`spinner-${tableId.split('-')[1]}`);
+            if (spinner) spinner.style.display = 'inline-block';
+            
+            clearTimeout(window[`timeout_${tableId}`]);
+            window[`timeout_${tableId}`] = setTimeout(() => {
+                filterTable(tableId);
+                if (spinner) spinner.style.display = 'none';
+            }, 300);
+        }
+
+        function filterTable(tableId) {
+            const table = document.getElementById(tableId);
+            const filterContainer = document.getElementById(`filters-${tableId}`).querySelector('.filters-grid');
+            const filterColumns = filterContainer.querySelectorAll('.filter-column');
+            const rows = table.querySelector('tbody').rows;
+
+            for (let i = 0; i < rows.length; i++) {
+                let showRow = true;
+                filterColumns.forEach((col, idx) => {
+                    const input = col.querySelector('.filter-input');
+                    const combo = col.querySelector('.filter-combo');
+                    
+                    const filterValue = input.value.toLowerCase();
+                    const comboValue = combo.value;
+
+                    if (filterValue || comboValue) {
+                        const cellValue = rows[i].cells[idx].textContent.toLowerCase();
+                        
+                        if (filterValue && cellValue.indexOf(filterValue) === -1) {
+                            showRow = false;
+                        }
+                        
+                        if (comboValue && cellValue !== comboValue.toLowerCase()) {
+                            showRow = false;
+                        }
+                    }
+                });
+                rows[i].style.display = showRow ? "" : "none";
+            }
+        }
+
+        function filterTableByCombo(tableId, colIdx, value) {
+            const spinner = document.getElementById(`spinner-${tableId.split('-')[1]}`);
+            if (spinner) spinner.style.display = 'inline-block';
+
+            setTimeout(() => {
+                filterTable(tableId);
+                if (spinner) spinner.style.display = 'none';
+            }, 100);
+        }
+
+        function filterByCfop(cfop) {
+            const filtered = allProducts.filter(p => p.cfop === cfop);
+            renderProducts(filtered);
+            
+            const s = cfopSummary.get(cfop);
+            document.getElementById('modal-cfop-id').innerText = cfop;
+            document.getElementById('modal-total-prod').innerText = s.qtd;
+            document.getElementById('modal-total-valor').innerText = s.valor.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
+            document.getElementById('modal-total-icms').innerText = s.icms.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
+            document.getElementById('modal-total-st').innerText = s.st.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
+            document.getElementById('modal-total-ipi').innerText = s.ipi.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
+            document.getElementById('modal-total-pis').innerText = s.pis.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
+            document.getElementById('modal-total-cofins').innerText = s.cofins.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
+            
+            modal.style.display = 'flex';
+            clearFilterBtn.style.display = 'inline-block';
+            document.getElementById('card-produtos').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        clearFilterBtn.onclick = () => {
+            renderProducts(allProducts);
+            clearFilterBtn.style.display = 'none';
+            document.querySelectorAll('.filter-input').forEach(input => input.value = '');
+            document.querySelectorAll('.filter-combo').forEach(combo => combo.value = '');
+            document.querySelectorAll('.batch-new-value').forEach(input => input.value = '');
+            document.querySelectorAll('.batch-column-select').forEach(select => select.value = '');
+            document.querySelectorAll('table tbody').forEach(tbody => {
+                Array.from(tbody.querySelectorAll('tr')).forEach(row => row.style.display = '');
+            });
+            document.querySelectorAll('.filters-section').forEach(section => {
+                section.classList.remove('active');
+            });
+        };
+
+        function addRow(tableId, cells) {
+            const tbody = document.querySelector(`#${tableId} tbody`);
+            const row = document.createElement('tr');
+            cells.forEach(text => {
+                const td = document.createElement('td');
+                td.innerText = text;
+                row.appendChild(td);
+            });
+            tbody.appendChild(row);
+            document.getElementById(`msg-${tableId.split('-')[1]}`).style.display = 'none';
+        }
+
+        // Lógica de Alteração em Lote
+        function applyBatchUpdate(tableId) {
+            const colSelect = document.querySelector(`.batch-column-select[data-table="${tableId}"]`);
+            const newValueInput = document.querySelector(`.batch-new-value[data-table="${tableId}"]`);
+            
+            const colIdx = colSelect.value;
+            const newVal = newValueInput.value;
+
+            if (!colIdx || !newVal) {
+                alert('Selecione a coluna e informe o novo valor');
+                return;
+            }
+
+            const rows = document.getElementById(tableId).querySelector('tbody').rows;
+            let count = 0;
+
+            for (let i = 0; i < rows.length; i++) {
+                if (rows[i].style.display !== 'none') {
+                    const cell = rows[i].cells[colIdx];
+                    cell.textContent = newVal;
+                    count++;
+                }
+            }
+
+            alert(`${count} registro(s) alterado(s) com sucesso!`);
+            newValueInput.value = '';
+            colSelect.value = '';
+            populateAllFilters();
+        }
+    </script>
+</body>
+</html>
